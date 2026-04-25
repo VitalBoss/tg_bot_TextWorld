@@ -1,0 +1,15 @@
+services:
+  bot:
+    build: .
+    restart: always
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+
+  redis:
+    image: "redis:7-alpine"
+    restart: always
