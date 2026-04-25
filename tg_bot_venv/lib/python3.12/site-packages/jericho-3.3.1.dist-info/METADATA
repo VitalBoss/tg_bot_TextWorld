@@ -1,0 +1,19 @@
+Metadata-Version: 2.4
+Name: jericho
+Version: 3.3.1
+Summary: A python interface to text-based adventure games.
+Author: Matthew Hausknecht
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)
+Classifier: Operating System :: POSIX :: Linux
+Requires-Python: >=3.9
+License-File: LICENSE
+Requires-Dist: numpy
+Requires-Dist: spacy>=2.1.0
+Requires-Dist: termcolor
+Dynamic: author
+Dynamic: classifier
+Dynamic: license-file
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
