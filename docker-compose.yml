@@ -4,8 +4,14 @@ services:
     restart: always
     env_file:
       - .env
+    environment:
+      - DATABASE_URL=postgresql://bot:secret@db:5432/textworld_bot
+      - REDIS_URL=redis://redis:6379
     depends_on:
-      - redis
+      redis:
+        condition: service_started
+      db:
+        condition: service_healthy
     dns:
       - 8.8.8.8
       - 1.1.1.1
@@ -13,3 +19,25 @@ services:
   redis:
     image: "redis:7-alpine"
     restart: always
+    ports:
+      - "6379:6379"
+
+  db:
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_DB: textworld_bot
+      POSTGRES_USER: bot
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bot -d textworld_bot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
