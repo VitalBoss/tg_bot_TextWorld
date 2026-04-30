@@ -1,6 +1,5 @@
 import os
 import asyncpg
-from typing import Optional
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://bot:secret@localhost:5432/textworld_bot")
 
@@ -23,6 +22,8 @@ async def init_db(pool):
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
                 game_file_path TEXT NOT NULL,
+                quest_name TEXT NOT NULL DEFAULT 'Unknown Quest',
+                difficulty VARCHAR(10) DEFAULT 'medium',
                 status VARCHAR(20) DEFAULT 'active',
                 started_at TIMESTAMPTZ DEFAULT NOW(),
                 finished_at TIMESTAMPTZ
@@ -36,5 +37,17 @@ async def init_db(pool):
                 feedback TEXT,
                 admissible_commands TEXT[],
                 created_at TIMESTAMPTZ DEFAULT NOW()
+            );
+
+            CREATE TABLE IF NOT EXISTS completed_quests (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                session_id UUID REFERENCES game_sessions(id) ON DELETE SET NULL,
+                quest_name TEXT NOT NULL,
+                difficulty VARCHAR(10) NOT NULL,
+                success BOOLEAN NOT NULL,
+                steps_count INTEGER NOT NULL,
+                reward INTEGER NOT NULL,
+                completed_at TIMESTAMPTZ DEFAULT NOW()
             );
         ''')

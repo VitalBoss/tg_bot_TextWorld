@@ -33,6 +33,5 @@ async def generate_hint(feedback: str, admissible_commands: List[str]) -> str:
         "Подсказка:"
     )
     
-    # Асинхронный вызов модели
-    response = await model.ainvoke(prompt)
-    return response.strip()
+    response = model.invoke(prompt)
+    return response.content.strip()

@@ -2,6 +2,7 @@ import sys
 print("=== START ===", flush=True)
 sys.stdout.flush()
 # DATABASE_URL=postgresql://bot:secret@db:5432/textworld_bot
+# postgresql://bot:secret@localhost:5432/textworld_bot
 import asyncio
 import os
 from dotenv import load_dotenv
@@ -59,3 +60,6 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+# docker-compose down
+# docker-compose up --build -d
