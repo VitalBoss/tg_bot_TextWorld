@@ -25,12 +25,15 @@ class SessionLogger:
 
     async def update_session_status(self, session_id: str, status: str):
         async with self.pool.acquire() as conn:
-            await conn.execute('''
-                UPDATE game_sessions
-                SET status = $2,
-                    finished_at = CASE WHEN $2 IN ('completed','abandoned') THEN NOW() ELSE finished_at END
-                WHERE id = $1
-            ''', session_id, status)
+            await conn.execute(
+                "UPDATE game_sessions SET status = $1 WHERE id = $2",
+                status, session_id
+            )
+            if status in ('completed', 'abandoned'):
+                await conn.execute(
+                    "UPDATE game_sessions SET finished_at = NOW() WHERE id = $1",
+                    session_id
+                )
 
     async def save_quest(self, user_id: int, session_id: str, difficulty: str, success: bool, steps_count: int, reward: int):
         async with self.pool.acquire() as conn:

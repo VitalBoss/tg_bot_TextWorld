@@ -1,19 +1,24 @@
 from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-def main_menu():
+def main_menu(has_incomplete: bool = False):
     builder = ReplyKeyboardBuilder()
     builder.button(text="🕹 Новая игра")
     builder.button(text="📊 Статистика")
     builder.button(text="📜 Справка")
     return builder.as_markup(resize_keyboard=True)
 
+def main_menu_inline():
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🕹 Новая игра", callback_data="newgame")
+    builder.button(text="📊 Статистика", callback_data="stats")
+    builder.button(text="📜 Справка", callback_data="help")
+    return builder.as_markup()
 
 def game_menu():
     builder = ReplyKeyboardBuilder()
-    builder.button(text="🔄 Новая игра")
+    builder.button(text="🕹 Новая игра")
     builder.button(text="💡 Подсказка")
-    builder.button(text="⏸ Пауза")
+    builder.button(text="🏁 Завершить игру")
     return builder.as_markup(resize_keyboard=True)
 
 def difficulty_keyboard():
