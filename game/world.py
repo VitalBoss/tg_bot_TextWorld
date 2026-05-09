@@ -3,6 +3,9 @@ import tempfile
 import uuid
 from config import request_infos
 import textworld
+import logging
+logger = logging.getLogger("game.world")
+
 
 def make_new_world(difficulty: str = "medium"):
     """
@@ -29,15 +32,19 @@ def make_new_world(difficulty: str = "medium"):
         cmd.append(game_path)
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
-            print(f"Ошибка генерации игры: {result.stderr}")
+            logger.error(f"Ошибка генерации игры: {result.stderr}")
             return None, None
         quest_name = f"Quest-{uuid.uuid4().hex[:8]}"
         return game_path, quest_name
 
 class GameSession:
     def __init__(self, game_path: str):
-        self.env = textworld.start(game_path, request_infos)
-        self.state = self.env.reset()
+        try:
+            self.env = textworld.start(game_path, request_infos)
+            self.state = self.env.reset()
+        except Exception as e:
+            logger.exception(f"Failed to start game session for {game_path}")
+            raise 
 
     def step(self, command: str):
         self.state, reward, done = self.env.step(command)

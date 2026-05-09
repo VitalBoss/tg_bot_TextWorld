@@ -7,6 +7,8 @@ import os
 from bot.keyboards import (
     main_menu, game_menu, difficulty_keyboard, confirm_new_game_keyboard, main_menu_inline
 )
+import logging
+logger = logging.getLogger("bot.handlers")
 
 router = Router()
 
@@ -57,8 +59,8 @@ async def hint_request(message: types.Message):
         hint = await generate_hint(feedback, commands)
         await thinking_msg.edit_text(f"💡 Подсказка:\n\n{hint}")
     except Exception as e:
+        logger.exception("GigaChat hint generation failed")
         await thinking_msg.edit_text("❌ Не удалось получить подсказку. Попробуйте позже.")
-        print(f"Ошибка GigaChat: {e}")
 
 # Досрочное завершение игры
 @router.message(F.text == "🏁 Завершить игру")

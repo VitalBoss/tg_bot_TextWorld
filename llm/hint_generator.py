@@ -3,7 +3,9 @@ import os
 from typing import List
 from langchain_gigachat import GigaChat
 from dotenv import load_dotenv
+import logging
 
+logger = logging.getLogger("llm.hint_generator")
 load_dotenv()
 
 # Инициализируем один экземпляр модели на всё приложение
@@ -32,6 +34,9 @@ async def generate_hint(feedback: str, admissible_commands: List[str]) -> str:
         f"Доступные команды: {commands_str}\n\n"
         "Подсказка:"
     )
-    
-    response = model.invoke(prompt)
-    return response.content.strip()
+    try:
+        response = model.ainvoke(prompt)  
+        return response.content.strip()
+    except Exception as e:
+        logger.exception("GigaChat API error")
+        return "GigaChat API error"
