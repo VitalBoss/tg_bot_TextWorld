@@ -21,7 +21,7 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 logger = logging.getLogger(__name__)
-
+# docker compose down && docker compose build --no-cache && docker compose up -d
 WEBHOOK_MODE = os.getenv("WEBHOOK_MODE", "false").lower() == "true"
 WEBHOOK_HOST = os.getenv("WEBHOOK_HOST", "https://your-domain.com")
 WEBHOOK_PATH = "/webhook"

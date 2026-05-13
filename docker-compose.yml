@@ -51,5 +51,23 @@ services:
     depends_on:
       - bot
 
+  ollama:
+    image: ollama/ollama:0.6.6
+    restart: always
+    environment:
+      - OLLAMA_KEEP_ALIVE=1h
+      - OLLAMA_HOST=0.0.0.0:11434
+    volumes:
+      - ./models/Modelfile:/models/Modelfile:ro
+      - ./adapters:/adapters
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434" # опционально для отладки
+    deploy:
+      resources:
+        limits:
+          memory: 5G  
+
 volumes:
   pgdata:
+  ollama_data:

@@ -43,24 +43,67 @@ async def hint_request(message: types.Message):
     redis = message.bot.redis
     service = SessionService(redis)
     game_path, history = await service.get_session(message.from_user.id)
+
     if game_path is None:
-        await message.answer("Нет активной игры.", reply_markup=main_menu())
+        await message.answer("Игра не найдена. Начните новую игру.", reply_markup=main_menu())
         return
 
+    # Восстанавливаем состояние игры для получения контекста
     session = GameSession(game_path)
     for cmd in history:
         session.step(cmd)
+
     feedback = session.state.get("feedback", "")
     commands = session.state.get("admissible_commands", [])
 
-    thinking_msg = await message.answer("⏳ Генерирую подсказку...")
-    try:
-        from llm.hint_generator import generate_hint
-        hint = await generate_hint(feedback, commands)
-        await thinking_msg.edit_text(f"💡 Подсказка:\n\n{hint}")
-    except Exception as e:
-        logger.exception("GigaChat hint generation failed")
-        await thinking_msg.edit_text("❌ Не удалось получить подсказку. Попробуйте позже.")
+    # Показываем клавиатуру выбора модели
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🧠 Большая LLM (GigaChat)", callback_data="hint_big")
+    builder.button(text="💻 Малая LLM (Qwen)", callback_data="hint_small")
+    await message.answer("Выберите модель для подсказки:", reply_markup=builder.as_markup())
+
+async def _generate_hint_by_model(callback: types.CallbackQuery, model_type: str):
+    redis = callback.bot.redis
+    service = SessionService(redis)
+    game_path, history = await service.get_session(callback.from_user.id)
+
+    if game_path is None:
+        await callback.message.edit_text("Игра не найдена.")
+        await callback.answer()
+        return
+
+    # Восстанавливаем состояние ещё раз (быстро)
+    session = GameSession(game_path)
+    for cmd in history:
+        session.step(cmd)
+
+    feedback = session.state.get("feedback", "")
+    commands = session.state.get("admissible_commands", [])
+
+    # Сообщение-заглушка на время генерации
+    await callback.message.edit_text("⏳ Генерирую подсказку...")
+
+    # Выбираем модель
+    from llm.hint_generator import generate_hint_gigachat, generate_hint_local
+    if model_type == "big":
+        hint = await generate_hint_gigachat(feedback, commands)
+    else:
+        hint = await generate_hint_local(feedback, commands)
+
+    # Ставим флаг использования подсказки (для рейтинга)
+    await redis.set(f"hint_used:{callback.from_user.id}", "1")
+
+    # Редактируем сообщение с результатом
+    await callback.message.edit_text(f"💡 Подсказка:\n\n{hint}")
+    await callback.answer()
+
+@router.callback_query(F.data == "hint_big")
+async def process_hint_big(callback: types.CallbackQuery):
+    await _generate_hint_by_model(callback, "big")
+
+@router.callback_query(F.data == "hint_small")
+async def process_hint_small(callback: types.CallbackQuery):
+    await _generate_hint_by_model(callback, "small")
 
 # Досрочное завершение игры
 @router.message(F.text == "🏁 Завершить игру")
@@ -283,7 +326,6 @@ async def back_to_main_menu(callback: types.CallbackQuery):
     await callback.message.edit_text("Выберите действие:", reply_markup=main_menu_inline())
     await callback.answer()
 
-# 🔥 Самый последний обработчик – игровой ход (ловит любой другой текст)
 @router.message(F.text)
 async def handle_move(message: types.Message):
     redis = message.bot.redis
@@ -302,6 +344,7 @@ async def handle_move(message: types.Message):
 
     feedback, commands, done, reward = session.step(message.text)
 
+    # Получаем ID сессии в PostgreSQL
     pg_session_id = await redis.get(f"pg_session:{message.from_user.id}")
     if pg_session_id:
         pg_session_id = pg_session_id.decode() if isinstance(pg_session_id, bytes) else pg_session_id
@@ -309,19 +352,50 @@ async def handle_move(message: types.Message):
         await logger.log_move(pg_session_id, move_number, message.text, feedback, commands)
 
     if done:
+        # Сохраняем завершённый квест
         if pg_session_id:
             diff = await redis.get(f"pg_session_diff:{message.from_user.id}")
             diff = diff.decode() if diff else 'medium'
             success = reward > 0
             await logger.save_quest(message.from_user.id, pg_session_id, diff, success, move_number, reward)
             await logger.update_session_status(pg_session_id, 'completed')
-        response = f"{feedback}\n\nИгра окончена! Начните новую, нажав кнопку."
+
+        # Проверяем, использовал ли игрок подсказку
+        hint_used = await redis.get(f"hint_used:{message.from_user.id}")
+        if hint_used:
+            # Удаляем флаг, чтобы он не висел
+            await redis.delete(f"hint_used:{message.from_user.id}")
+            # Показываем клавиатуру оценки
+            builder = InlineKeyboardBuilder()
+            for i in range(1, 6):
+                builder.button(text=f"{i}⭐", callback_data=f"rate_hint_{i}")
+            await message.answer("Оцените, насколько полезны были подсказки:", reply_markup=builder.as_markup())
+
+        # Чистим Redis (pg_session_id удалится после оценки, если она была)
         await service.delete_session(message.from_user.id)
-        await redis.delete(f"pg_session:{message.from_user.id}", f"pg_session_diff:{message.from_user.id}")
+        await redis.delete(f"pg_session_diff:{message.from_user.id}")
+
+        response = f"{feedback}\n\nИгра окончена! Начните новую, нажав кнопку."
         await message.answer(response, reply_markup=main_menu())
+
     else:
         history.append(message.text)
         await service.save_history(message.from_user.id, history)
         cmd_list = " ; ".join(commands) if commands else "Нет доступных команд"
-        response = f"{feedback}\n\nДопустимые команды:\n{cmd_list}"
+        response = f"{feedback}\n\nДоступные команды:\n{cmd_list}"
         await message.answer(response, reply_markup=game_menu())
+
+@router.callback_query(F.data.startswith("rate_hint_"))
+async def process_hint_rating(callback: types.CallbackQuery):
+    rating = int(callback.data.split("_")[-1])
+    redis = callback.bot.redis
+    logger = callback.bot.logger
+    
+    # Получаем session_id из Redis (он ещё должен быть там, так как мы не удаляли после done)
+    session_id = await redis.get(f"pg_session:{callback.from_user.id}")
+    if session_id:
+        session_id = session_id.decode() if isinstance(session_id, bytes) else session_id
+        await logger.save_rating(callback.from_user.id, session_id, rating)
+    
+    await callback.message.edit_text("Спасибо за оценку! 🎉")
+    await callback.answer()

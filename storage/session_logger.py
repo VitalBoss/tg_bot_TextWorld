@@ -89,3 +89,13 @@ class SessionLogger:
                 ORDER BY started_at DESC LIMIT 1
             ''', user_db_id)
             return dict(row) if row else None
+        
+async def save_rating(self, user_id: int, session_id: str, rating: int):
+    async with self.pool.acquire() as conn:
+        user_db_id = await conn.fetchval('SELECT id FROM users WHERE telegram_id = $1', user_id)
+        if not user_db_id:
+            return
+        await conn.execute('''
+            INSERT INTO hint_ratings (user_id, session_id, rating)
+            VALUES ($1, $2, $3)
+        ''', user_db_id, session_id, rating)

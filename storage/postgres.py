@@ -51,3 +51,13 @@ async def init_db(pool):
                 completed_at TIMESTAMPTZ DEFAULT NOW()
             );
         ''')
+
+        await conn.execute('''
+            CREATE TABLE IF NOT EXISTS hint_ratings (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                session_id UUID REFERENCES game_sessions(id) ON DELETE SET NULL,
+                rating INTEGER CHECK (rating BETWEEN 1 AND 5),
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
+        ''')
